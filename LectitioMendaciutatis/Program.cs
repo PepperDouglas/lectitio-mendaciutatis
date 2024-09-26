@@ -1,11 +1,16 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
+using Microsoft.EntityFrameworkCore;
+using LectitioMendaciutatis.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
+
+builder.Services.AddDbContext<ChatContext>(options =>
+    options.UseSqlite(builder.Configuration.GetConnectionString("ChatDbConnection")));
 
 var app = builder.Build();
 
