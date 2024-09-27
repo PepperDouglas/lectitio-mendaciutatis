@@ -1,0 +1,83 @@
+@inject NavigationManager NavigationManager
+@inject Blazored.SessionStorage.ISessionStorageService sessionStorage
+
+@page "/chat"
+@using Microsoft.AspNetCore.SignalR.Client
+@using System.IdentityModel.Tokens.Jwt
+@using System.Security.Claims
+
+<h3>Chat Room</h3>
+
+@if (!isConnected) {
+    <p>Connecting to the chat...</p>
+} else {
+    <div id="chat">
+        @foreach (var msg in messages) {
+            <p><strong>@msg.Username</strong>: @msg.Message</p>
+        }
+    </div>
+
+    <InputText @bind-Value="message" @onkeypress="CheckAndSendMessage" />
+    <button @onclick="SendMessage" disabled="@string.IsNullOrEmpty(message)">Send</button>
+}
+
+@code {
+    private List<ChatMessage> messages = new();
+    private string message = "";
+    private string username = "";
+    private bool isConnected = false;
+
+    private HubConnection? hubConnection;
+
+    protected override async Task OnInitializedAsync() {
+        // Get JWT token from sessionStorage
+        var token = await sessionStorage.GetItemAsync<string>("jwtToken");
+
+        // Redirect to login if token is missing
+        if (string.IsNullOrEmpty(token)) {
+            NavigationManager.NavigateTo("/login");
+            return;
+        }
+
+        // Decode the JWT token to extract the username
+        var handler = new JwtSecurityTokenHandler();
+        var jwtToken = handler.ReadJwtToken(token);
+        username = jwtToken.Claims.First(claim => claim.Type == ClaimTypes.Name).Value;
+
+        // Connect to SignalR hub, passing the JWT token for authentication
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(NavigationManager.ToAbsoluteUri("/chathub"), options => {
+                options.AccessTokenProvider = () => Task.FromResult(token);
+            })
+            .Build();
+
+        // Handle incoming messages from the server
+        hubConnection.On<string, string>("ReceiveMessage", (user, message) => {
+            messages.Add(new ChatMessage { Username = user, Message = message });
+            StateHasChanged();
+        });
+
+        // Start the connection
+        await hubConnection.StartAsync();
+        isConnected = true;
+    }
+
+    private async Task SendMessage() {
+        if (hubConnection is not null && !string.IsNullOrEmpty(message)) {
+            await hubConnection.SendAsync("SendMessage", username, message);
+            message = "";
+        }
+    }
+
+    private void CheckAndSendMessage(KeyboardEventArgs e) {
+        if (e.Key == "Enter" && !string.IsNullOrEmpty(message)) {
+            SendMessage();
+        }
+    }
+
+    private class ChatMessage
+    {
+        public string Username { get; set; }
+        public string Message { get; set; }
+    }
+}
