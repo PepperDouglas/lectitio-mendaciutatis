@@ -60,7 +60,7 @@ builder.WebHost.ConfigureKestrel(options =>
     options.ListenAnyIP(5024); // HTTP
     options.ListenAnyIP(5001, listenOptions =>
     {
-        listenOptions.UseHttps(); // HTTPS
+        listenOptions.UseHttps("certs/selfsigned.pfx", "securecert"); // HTTPS
     });
 });
 
