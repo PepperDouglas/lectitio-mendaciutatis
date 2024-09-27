@@ -1,5 +1,6 @@
 @inject NavigationManager NavigationManager
 @inject Blazored.SessionStorage.ISessionStorageService sessionStorage
+@inject IConfiguration Configuration
 
 @page "/chat"
 @using Microsoft.AspNetCore.SignalR.Client
@@ -26,6 +27,7 @@
     private string message = "";
     private string username = "";
     private bool isConnected = false;
+    private string aesKey;
 
     private HubConnection? hubConnection;
 
@@ -38,6 +40,9 @@
             NavigationManager.NavigateTo("/login");
             return;
         }
+
+        //read the aes key from config
+        aesKey = Configuration["AESKey"];
 
         // Decode the JWT token to extract the username
         var handler = new JwtSecurityTokenHandler();
@@ -60,9 +65,13 @@
             .Build();
 
         // Handle incoming messages from the server
-        hubConnection.On<string, string>("ReceiveMessage", (user, message) => {
-            messages.Add(new ChatMessage { Username = user, Message = message });
+        hubConnection.On<string, string>("ReceiveMessage", (user, encryptedMessage) => {
+            var aesHelper = new AesEncryptionHelper(aesKey);
+            Console.WriteLine($"Received encrypted message client: {encryptedMessage}");
+            string decryptedMessage = aesHelper.Decrypt(encryptedMessage);
+            Console.WriteLine($"Decrypted message client: {decryptedMessage}");
 
+            messages.Add(new ChatMessage { Username = user, Message = decryptedMessage });
             // Trigger asynchronous UI re-render when new messages are received
             InvokeAsync(StateHasChanged);
             //StateHasChanged();
@@ -73,15 +82,22 @@
         isConnected = true;
     }
 
-    private void OnInputChanged(ChangeEventArgs e)
-    {
+    private void OnInputChanged(ChangeEventArgs e) {
         message = e.Value?.ToString();
         //StateHasChanged();  // Force a UI update after typing
     }
 
+    private string EncryptMessage(string message) {
+        var aesHelper = new AesEncryptionHelper(aesKey);
+        return aesHelper.Encrypt(message);
+    }
+
     private async Task SendMessage() {
         if (hubConnection is not null && !string.IsNullOrEmpty(message)) {
-            await hubConnection.SendAsync("SendMessage", username, message);
+            Console.WriteLine($"Encrypting message: {message}");
+            string encryptedMessage = EncryptMessage(message);
+            Console.WriteLine($"Encrypted message: {encryptedMessage}");
+            await hubConnection.SendAsync("SendMessage", username, encryptedMessage);
             message = "";
         }
     }
