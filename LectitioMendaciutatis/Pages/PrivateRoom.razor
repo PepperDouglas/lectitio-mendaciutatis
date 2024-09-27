@@ -1,0 +1,140 @@
+@using Microsoft.AspNetCore.SignalR.Client
+@inject NavigationManager NavigationManager
+@inject Blazored.SessionStorage.ISessionStorageService sessionStorage
+@inject IConfiguration Configuration
+
+@page "/private/{roomName}"
+
+<h3>Private Room: @roomName</h3>
+
+<!-- List of users eligible for this room -->
+<h4>Eligible Users</h4>
+<ul>
+    @foreach (var user in eligibleUsers) {
+        <li>@user <button @onclick="() => RemoveUser(user)">Remove</button></li>
+    }
+</ul>
+
+<!-- Add users to the room -->
+<h4>Add Users</h4>
+<input @bind="newUser" placeholder="Enter username" />
+<button @onclick="AddUser">Add User</button>
+
+@if (!isConnected) {
+    <p>Connecting to the private chat...</p>
+} else {
+    <div id="chat">
+        @foreach (var msg in displayMessages) {
+            <p><strong>@msg.Username</strong>: @msg.Message</p>
+        }
+    </div>
+
+    <InputText @bind-Value="message" @oninput="OnInputChanged" @onkeypress="CheckAndSendMessage" />
+    <button @onclick="SendMessage" disabled="@string.IsNullOrEmpty(message)">Send</button>
+}
+
+<button @onclick="LeaveRoom">Leave Room</button>
+
+@code {
+    [Parameter]
+    public string roomName { get; set; }
+    private List<ChatMessage> displayMessages = new();
+    private List<string> eligibleUsers = new();
+    private string newUser = "";
+    private HubConnection hubConnection;
+    private bool isConnected = false;
+    private List<ChatMessage> messages = new();
+    private string message = "";
+
+    private string aesKey;
+
+    // Initialize SignalR hub connection for private room
+    protected override async Task OnInitializedAsync() {
+
+        var jwtToken = await sessionStorage.GetItemAsync<string>("jwtToken");
+
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(NavigationManager.ToAbsoluteUri($"/chathub?room={roomName}"), options => {
+                options.AccessTokenProvider = () => Task.FromResult(jwtToken);
+            })
+            .Build();
+
+        aesKey = Configuration["AESKey"];
+
+        // Set up message receiving
+        hubConnection.On<string, string>("ReceiveMessage", (user, encryptedMessage) => {
+            var aesHelper = new AesEncryptionHelper(aesKey); // Use the shared AES key
+            string decryptedMessage = aesHelper.Decrypt(encryptedMessage);
+            // Handle the decrypted message here (e.g., display it in the UI)
+            messages.Add(new ChatMessage { Username = user, Message = decryptedMessage });
+            UpdateDisplayMessages();
+            InvokeAsync(StateHasChanged);
+        });
+
+        try {
+            await hubConnection.StartAsync();
+            isConnected = true;
+
+            // Fetch eligible users only after the connection is ready
+            eligibleUsers = await hubConnection.InvokeAsync<List<string>>("GetEligibleUsers", roomName);
+        }
+        catch (Exception ex) {
+            Console.WriteLine($"Error starting SignalR connection: {ex.Message}");
+        }
+    }
+
+    // Send a message to the private room
+    private async Task SendMessage() {
+        if (!string.IsNullOrEmpty(message)) {
+            var aesHelper = new AesEncryptionHelper(aesKey);
+            string encryptedMessage = aesHelper.Encrypt(message);
+
+            if (hubConnection.State == HubConnectionState.Connected) {
+                //should NOT be roomname, but username (in fact, in should be both)
+                await hubConnection.SendAsync("SendMessage", roomName, encryptedMessage); // Send encrypted message
+                message = "";  // Clear message input
+            } else {
+                Console.WriteLine("Connection is not established yet.");
+            }
+        }
+    }
+
+    // Check if Enter is pressed to send message
+    private async Task CheckAndSendMessage(KeyboardEventArgs e) {
+        if (e.Key == "Enter" && !string.IsNullOrEmpty(message)) {
+            await SendMessage();
+        }
+    }
+
+    private void OnInputChanged(ChangeEventArgs e) {
+        message = e.Value.ToString();
+    }
+
+    private void UpdateDisplayMessages() {
+        displayMessages = new List<ChatMessage>(messages);  // Create a safe copy for rendering
+    }
+
+    // Add a user to the room
+    private async Task AddUser() {
+        await hubConnection.SendAsync("AddUserToRoom", roomName, newUser);
+        newUser = ""; // Clear input after adding
+    }
+
+    // Remove a user from the room
+    private async Task RemoveUser(string username) {
+        await hubConnection.SendAsync("RemoveUserFromRoom", roomName, username);
+    }
+
+    // Leave the private room and return to the main chat room
+    private void LeaveRoom() {
+        hubConnection.StopAsync(); // Stop SignalR connection when leaving the room
+        displayMessages.Clear();
+        NavigationManager.NavigateTo("/chat"); // Redirect back to main chat room
+    }
+
+    private class ChatMessage
+    {
+        public string Username { get; set; }
+        public string Message { get; set; }
+    }
+}
