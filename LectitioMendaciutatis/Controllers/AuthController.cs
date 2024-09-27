@@ -49,7 +49,10 @@ namespace LectitioMendaciutatis.Controllers
                 return Unauthorized(new { message = "Invalid credentials" });
             }
 
+            // Generate a JWT token if login is successful
             var token = GenerateJwtToken(user);
+
+            // Return the token as part of the JSON response
             return Ok(new { Token = token });
         }
 

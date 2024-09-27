@@ -1,11 +1,16 @@
 using Microsoft.AspNetCore.SignalR;
 using LectitioMendaciutatis.Data;
 using LectitioMendaciutatis.Models;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using System.Threading.Tasks;
 using System.Linq;
+using Microsoft.AspNetCore.Authorization;
 
 namespace LectitioMendaciutatis.Hubs
 {
+    //Ensure that only authenticated users can connect
+    [Authorize] 
     public class ChatHub : Hub
     {
         private readonly ChatContext _context;
@@ -34,18 +39,22 @@ namespace LectitioMendaciutatis.Hubs
         // Send a message to all connected clients
         public async Task SendMessage(string user, string message)
         {
-            // Save the message to the database
-            var chatMessage = new ChatMessage
-            {
-                Username = user,
-                Message = message
-            };
+            if (Context.User?.Identity?.IsAuthenticated == true) {
+                // Save the message to the database
+                var chatMessage = new ChatMessage
+                {
+                    Username = user,
+                    Message = message
+                };
 
-            _context.ChatMessages.Add(chatMessage);
-            await _context.SaveChangesAsync();
+                _context.ChatMessages.Add(chatMessage);
+                await _context.SaveChangesAsync();
 
-            // Broadcast the message to all clients
-            await Clients.All.SendAsync("ReceiveMessage", user, message);
+                // Broadcast the message to all clients
+                await Clients.All.SendAsync("ReceiveMessage", user, message);
+            } else {
+                throw new HubException("You are not authorized to send messages.");
+            }
         }
     }
 }
