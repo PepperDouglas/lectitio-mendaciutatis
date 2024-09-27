@@ -1,0 +1,60 @@
+@inject NavigationManager NavigationManager
+@inject HttpClient Http
+
+@page "/signup"
+
+<h3>Sign Up</h3>
+
+@if (errorMessage != null)
+{
+    <p style="color:red">@errorMessage</p>
+}
+
+<EditForm Model="@userDto" OnValidSubmit="HandleSignup">
+    <div>
+        <label>Username:</label>
+        <InputText @bind-Value="userDto.Username" />
+    </div>
+    <div>
+        <label>Password:</label>
+        <InputText @bind-Value="userDto.Password" InputType="password" />
+    </div>
+    <div>
+        <label>Confirm Password:</label>
+        <InputText @bind-Value="userDto.ConfirmPassword" InputType="password" />
+    </div>
+    <button type="submit">Sign Up</button>
+</EditForm>
+
+@code {
+    private UserDto userDto = new UserDto();
+    private string? errorMessage;
+
+    private async Task HandleSignup()
+    {
+        try
+        {
+            var response = await Http.PostAsJsonAsync("/api/auth/signup", userDto);
+            if (response.IsSuccessStatusCode)
+            {
+                NavigationManager.NavigateTo("/login");
+            }
+            else
+            {
+                var data = await response.Content.ReadFromJsonAsync<Dictionary<string, string>>();
+                errorMessage = data?["message"];
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "An error occurred during sign-up: " + ex.Message;
+        }
+    }
+
+    public class UserDto
+    {
+        public string Username { get; set; }
+        public string Password { get; set; }
+        public string ConfirmPassword { get; set; }
+    }
+}

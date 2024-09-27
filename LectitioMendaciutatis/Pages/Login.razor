@@ -1,0 +1,59 @@
+@inject NavigationManager NavigationManager
+@inject Blazored.SessionStorage.ISessionStorageService sessionStorage
+@inject HttpClient Http
+
+@page "/login"
+
+<h3>Login</h3>
+
+@if (errorMessage != null)
+{
+    <p style="color:red">@errorMessage</p>
+}
+
+<EditForm Model="@loginDto" OnValidSubmit="HandleLogin">
+    <div>
+        <label>Username:</label>
+        <InputText @bind-Value="loginDto.Username" />
+    </div>
+    <div>
+        <label>Password:</label>
+        <InputText @bind-Value="loginDto.Password" InputType="password" />
+    </div>
+    <button type="submit">Login</button>
+</EditForm>
+
+@code {
+    private LoginDto loginDto = new LoginDto();
+    private string? errorMessage;
+
+    private async Task HandleLogin()
+    {
+        try
+        {
+            var response = await Http.PostAsJsonAsync("/api/auth/login", loginDto);
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<Dictionary<string, string>>();
+                var token = result["Token"];
+                await sessionStorage.SetItemAsync("jwtToken", token);
+
+                NavigationManager.NavigateTo("/chat");
+            }
+            else
+            {
+                errorMessage = "Invalid credentials, try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "An error occurred during login: " + ex.Message;
+        }
+    }
+
+    public class LoginDto
+    {
+        public string Username { get; set; }
+        public string Password { get; set; }
+    }
+}
