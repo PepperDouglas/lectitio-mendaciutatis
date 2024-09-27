@@ -1,6 +1,7 @@
 @inject NavigationManager NavigationManager
 @inject Blazored.SessionStorage.ISessionStorageService sessionStorage
 @inject HttpClient Http
+@inject IHttpClientFactory HttpClientFactory
 
 @page "/login"
 
@@ -31,11 +32,16 @@
     {
         try
         {
-            var response = await Http.PostAsJsonAsync("/api/auth/login", loginDto);
+            var httpClient = HttpClientFactory.CreateClient("MyApiClient");
+            Console.WriteLine("Sending login request..."); // Log to check if this line is reached
+            var response = await httpClient.PostAsJsonAsync("/api/auth/login", loginDto);
             if (response.IsSuccessStatusCode)
             {
+                var responseContent = await response.Content.ReadAsStringAsync();
+                Console.WriteLine("Response content: " + responseContent);
+
                 var result = await response.Content.ReadFromJsonAsync<Dictionary<string, string>>();
-                var token = result["Token"];
+                var token = result["token"];
                 await sessionStorage.SetItemAsync("jwtToken", token);
 
                 NavigationManager.NavigateTo("/chat");

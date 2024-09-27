@@ -1,5 +1,6 @@
 @inject NavigationManager NavigationManager
 @inject HttpClient Http
+@inject IHttpClientFactory HttpClientFactory
 
 @page "/signup"
 
@@ -34,7 +35,8 @@
     {
         try
         {
-            var response = await Http.PostAsJsonAsync("/api/auth/signup", userDto);
+            var httpClient = HttpClientFactory.CreateClient("MyApiClient");
+            var response = await httpClient.PostAsJsonAsync("/api/auth/signup", userDto);
             if (response.IsSuccessStatusCode)
             {
                 NavigationManager.NavigateTo("/login");

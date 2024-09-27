@@ -15,7 +15,10 @@ builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
 builder.Services.AddSignalR();
 builder.Services.AddBlazoredSessionStorage();
-builder.Services.AddHttpClient();
+builder.Services.AddHttpClient("MyApiClient", client => {
+    var baseUrl = builder.Configuration["BaseUrl"] ?? "https://localhost:5001/";
+    client.BaseAddress = new Uri(baseUrl);
+});
 
 var secretKey = builder.Configuration["JwtSettings:Secret"];
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -47,9 +50,20 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
     });
 
+builder.Services.AddAuthorization();
 
 builder.Services.AddDbContext<ChatContext>(options =>
     options.UseSqlite(builder.Configuration.GetConnectionString("ChatDbConnection")));
+
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.ListenAnyIP(5024); // HTTP
+    options.ListenAnyIP(5001, listenOptions =>
+    {
+        listenOptions.UseHttps(); // HTTPS
+    });
+});
+
 
 var app = builder.Build();
 
@@ -64,6 +78,9 @@ if (!app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseRouting();
+
+app.UseAuthentication(); // This ensures JWT authentication is handled.
+app.UseAuthorization();  // This ensures that the [Authorize] attribute is respected.
 
 app.MapBlazorHub();
 app.MapFallbackToPage("/_Host");
