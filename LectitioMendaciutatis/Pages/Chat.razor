@@ -9,11 +9,32 @@
 
 <h3>Chat Room</h3>
 
+<!-- Create Private Room -->
+<button @onclick="CreateRoom">Create Private Room</button>
+
+<!-- Search for Available Rooms -->
+<input @bind="searchQuery" placeholder="Search Rooms" />
+<button @onclick="SearchRooms">Search</button>
+
+@if (availableRooms == null || availableRooms.Count == 0) {
+    <p>No rooms found.</p>
+} else {
+    <ul>
+        @foreach (var room in availableRooms) {
+            <li>
+                @room
+                <button @onclick="() => JoinRoom(room)">Join</button>
+            </li>
+        }
+    </ul>
+}
+
+
 @if (!isConnected) {
     <p>Connecting to the chat...</p>
 } else {
     <div id="chat">
-        @foreach (var msg in messages) {
+        @foreach (var msg in displayMessages) {
             <p><strong>@msg.Username</strong>: @msg.Message</p>
         }
     </div>
@@ -24,10 +45,13 @@
 
 @code {
     private List<ChatMessage> messages = new();
+    private List<ChatMessage> displayMessages = new();
     private string message = "";
     private string username = "";
     private bool isConnected = false;
     private string aesKey;
+    private string searchQuery = "";
+    private List<string> availableRooms = new();
 
     private HubConnection? hubConnection;
 
@@ -59,7 +83,7 @@
 
         // Connect to SignalR hub, passing the JWT token for authentication
         hubConnection = new HubConnectionBuilder()
-            .WithUrl(NavigationManager.ToAbsoluteUri("/chathub"), options => {
+            .WithUrl(NavigationManager.ToAbsoluteUri("/chathub?room=main"), options => {
                 options.AccessTokenProvider = () => Task.FromResult(token);
             })
             .Build();
@@ -72,6 +96,7 @@
             Console.WriteLine($"Decrypted message client: {decryptedMessage}");
 
             messages.Add(new ChatMessage { Username = user, Message = decryptedMessage });
+            UpdateDisplayMessages();
             // Trigger asynchronous UI re-render when new messages are received
             InvokeAsync(StateHasChanged);
             //StateHasChanged();
@@ -97,7 +122,7 @@
             Console.WriteLine($"Encrypting message: {message}");
             string encryptedMessage = EncryptMessage(message);
             Console.WriteLine($"Encrypted message: {encryptedMessage}");
-            await hubConnection.SendAsync("SendMessage", username, encryptedMessage);
+            await hubConnection.SendAsync("SendMessage", "main", username, encryptedMessage);
             message = "";
         }
     }
@@ -108,6 +133,33 @@
         }
 
         StateHasChanged();
+    }
+
+    private void UpdateDisplayMessages() {
+        displayMessages = new List<ChatMessage>(messages);  // Create a safe copy for rendering
+    }
+
+    // Create a new private room
+    private async Task CreateRoom() {
+        var roomName = "private/" + username;  // Room name is the creator's username
+        await hubConnection.SendAsync("CreateRoom");
+        NavigationManager.NavigateTo($"/{roomName}");  // Redirect to the private room
+    }
+
+    // Search for rooms
+    private async Task SearchRooms() {
+        await hubConnection.SendAsync("SearchRooms", searchQuery);
+        availableRooms = await hubConnection.InvokeAsync<List<string>>("SearchRooms", username);
+        if (availableRooms == null) {
+            availableRooms = new List<string>();
+        }
+    }
+
+    // Join the selected room
+    private void JoinRoom(string roomName) {
+        hubConnection.StopAsync(); // Stop SignalR connection when leaving the room
+        displayMessages.Clear();
+        NavigationManager.NavigateTo($"/{roomName}");  // Redirect to the private room
     }
 
     private class ChatMessage
