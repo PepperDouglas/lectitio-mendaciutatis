@@ -30,7 +30,16 @@ namespace LectitioMendaciutatis.Hubs
         {
             var aesHelper = new AesEncryptionHelper(_aesKey);
 
+            // Get the room name from the query string (passed by the client when connecting)
+            var httpContext = Context.GetHttpContext();
+            var roomName = httpContext.Request.Query["room"].ToString();
+            // If no room is provided, default to "main"
+            if (string.IsNullOrEmpty(roomName)) {
+                roomName = "main";
+            }
+
             var messages = _context.ChatMessages
+                .Where(m => m.RoomName == roomName)
                 .OrderBy(m => m.Timestamp)
                 .Take(50)
                 .ToList();
@@ -45,7 +54,7 @@ namespace LectitioMendaciutatis.Hubs
         }
 
         // Send a message to all connected clients
-        public async Task SendMessage(string user, string encryptedMessage)
+        public async Task SendMessage(string roomName, string user, string encryptedMessage)
         {
             if (Context.User?.Identity?.IsAuthenticated == true) {
                 //Decrypt message
@@ -58,7 +67,8 @@ namespace LectitioMendaciutatis.Hubs
                 var chatMessage = new ChatMessage
                 {
                     Username = user,
-                    Message = decryptedMessage
+                    Message = decryptedMessage,
+                    RoomName = roomName
                 };
 
                 _context.ChatMessages.Add(chatMessage);

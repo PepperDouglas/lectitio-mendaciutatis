@@ -1,4 +1,5 @@
 @using Microsoft.AspNetCore.SignalR.Client
+@using System.IdentityModel.Tokens.Jwt
 @inject NavigationManager NavigationManager
 @inject Blazored.SessionStorage.ISessionStorageService sessionStorage
 @inject IConfiguration Configuration
@@ -45,19 +46,24 @@
     private bool isConnected = false;
     private List<ChatMessage> messages = new();
     private string message = "";
+    private string username = "";
 
     private string aesKey;
 
     // Initialize SignalR hub connection for private room
     protected override async Task OnInitializedAsync() {
 
-        var jwtToken = await sessionStorage.GetItemAsync<string>("jwtToken");
+        var token = await sessionStorage.GetItemAsync<string>("jwtToken");
 
         hubConnection = new HubConnectionBuilder()
             .WithUrl(NavigationManager.ToAbsoluteUri($"/chathub?room={roomName}"), options => {
-                options.AccessTokenProvider = () => Task.FromResult(jwtToken);
+                options.AccessTokenProvider = () => Task.FromResult(token);
             })
             .Build();
+
+        var handler = new JwtSecurityTokenHandler();
+        var jwtToken = handler.ReadJwtToken(token);
+        username = jwtToken.Claims.First(claim => claim.Type == "unique_name").Value;
 
         aesKey = Configuration["AESKey"];
 
@@ -91,7 +97,7 @@
 
             if (hubConnection.State == HubConnectionState.Connected) {
                 //should NOT be roomname, but username (in fact, in should be both)
-                await hubConnection.SendAsync("SendMessage", roomName, encryptedMessage); // Send encrypted message
+                await hubConnection.SendAsync("SendMessage", roomName, username, encryptedMessage); // Send encrypted message
                 message = "";  // Clear message input
             } else {
                 Console.WriteLine("Connection is not established yet.");

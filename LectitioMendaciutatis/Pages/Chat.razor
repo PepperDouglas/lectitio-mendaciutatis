@@ -83,7 +83,7 @@
 
         // Connect to SignalR hub, passing the JWT token for authentication
         hubConnection = new HubConnectionBuilder()
-            .WithUrl(NavigationManager.ToAbsoluteUri("/chathub"), options => {
+            .WithUrl(NavigationManager.ToAbsoluteUri("/chathub?room=main"), options => {
                 options.AccessTokenProvider = () => Task.FromResult(token);
             })
             .Build();
@@ -122,7 +122,7 @@
             Console.WriteLine($"Encrypting message: {message}");
             string encryptedMessage = EncryptMessage(message);
             Console.WriteLine($"Encrypted message: {encryptedMessage}");
-            await hubConnection.SendAsync("SendMessage", username, encryptedMessage);
+            await hubConnection.SendAsync("SendMessage", "main", username, encryptedMessage);
             message = "";
         }
     }
