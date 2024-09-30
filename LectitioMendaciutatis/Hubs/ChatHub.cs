@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using System.Linq;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
+using Ganss.Xss;
 
 namespace LectitioMendaciutatis.Hubs
 {
@@ -18,11 +19,13 @@ namespace LectitioMendaciutatis.Hubs
         private readonly string _aesKey;
         //Name matched with list of eligable names
         private static Dictionary<string, List<string>> privateRooms = new();
+        private readonly HtmlSanitizer _htmlSanitizer;
 
         public ChatHub(ChatContext context, IConfiguration configuration)
         {
             _context = context;
             _aesKey = configuration["AESKey"];
+            _htmlSanitizer = new HtmlSanitizer();
         }
 
         // When a client connects, send the last 50 messages to them
@@ -63,18 +66,21 @@ namespace LectitioMendaciutatis.Hubs
                 string decryptedMessage = aesHelper.Decrypt(encryptedMessage);
                 Console.WriteLine($"Decrypted message: {decryptedMessage}");
 
+                //Sanitize message
+                string sanitizedMessage = _htmlSanitizer.Sanitize(decryptedMessage);
+
                 //Save the message to the database
                 var chatMessage = new ChatMessage
                 {
                     Username = user,
-                    Message = decryptedMessage,
+                    Message = sanitizedMessage,
                     RoomName = roomName
                 };
 
                 _context.ChatMessages.Add(chatMessage);
                 await _context.SaveChangesAsync();
 
-                string encryptedResponseMessage = aesHelper.Encrypt(decryptedMessage);
+                string encryptedResponseMessage = aesHelper.Encrypt(sanitizedMessage);
                 //Broadcast the message to all clients
                 await Clients.All.SendAsync("ReceiveMessage", user, encryptedResponseMessage);
             } else {
