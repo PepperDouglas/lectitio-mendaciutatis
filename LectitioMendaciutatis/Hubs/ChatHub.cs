@@ -8,6 +8,7 @@ using System.Linq;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Ganss.Xss;
+using Microsoft.AspNetCore.Http;
 
 namespace LectitioMendaciutatis.Hubs
 {
@@ -20,21 +21,29 @@ namespace LectitioMendaciutatis.Hubs
         //Name matched with list of eligable names
         private static Dictionary<string, List<string>> privateRooms = new();
         private readonly HtmlSanitizer _htmlSanitizer;
+        private readonly ILogger<ChatHub> _logger;
+        private readonly IHttpContextAccessor _httpContextAccessor;
 
-        public ChatHub(ChatContext context, IConfiguration configuration)
+        public ChatHub(ChatContext context, IConfiguration configuration, ILogger<ChatHub> logger, IHttpContextAccessor httpContextAccessor)
         {
             _context = context;
             _aesKey = configuration["AESKey"];
             _htmlSanitizer = new HtmlSanitizer();
+            _logger = logger;
+            _httpContextAccessor = httpContextAccessor;
         }
 
         // When a client connects, send the last 50 messages to them
         public override async Task OnConnectedAsync()
         {
+            var username = Context.User.Identity.Name;
+            _logger.LogInformation($"User connected: {username}");
+            _logger.LogInformation("User connected at {Time} with ConnectionId {ConnectionId}", DateTime.UtcNow, Context.ConnectionId);
             var aesHelper = new AesEncryptionHelper(_aesKey);
 
             // Get the room name from the query string (passed by the client when connecting)
-            var httpContext = Context.GetHttpContext();
+            //var httpContext = Context.GetHttpContext();
+            var httpContext = _httpContextAccessor.HttpContext;
             var roomName = httpContext.Request.Query["room"].ToString();
             // If no room is provided, default to "main"
             if (string.IsNullOrEmpty(roomName)) {
@@ -69,6 +78,10 @@ namespace LectitioMendaciutatis.Hubs
                 //Sanitize message
                 string sanitizedMessage = _htmlSanitizer.Sanitize(decryptedMessage);
 
+                if (sanitizedMessage != decryptedMessage) {
+                    _logger.LogWarning("Message from {User} was sanitized. Potential XSS detected.", user);
+                }
+
                 //Save the message to the database
                 var chatMessage = new ChatMessage
                 {
@@ -77,8 +90,15 @@ namespace LectitioMendaciutatis.Hubs
                     RoomName = roomName
                 };
 
-                _context.ChatMessages.Add(chatMessage);
-                await _context.SaveChangesAsync();
+                try {
+                    _context.ChatMessages.Add(chatMessage);
+                    await _context.SaveChangesAsync();
+                    _logger.LogInformation("Message from {User} in room {RoomName} was successfully saved at {Time}.", user, roomName, DateTime.UtcNow);
+
+                } catch (Exception ex) {
+                    _logger.LogError(ex, "Failed to save message from {User} in room {RoomName}.", user, roomName);
+                    throw new HubException("Could not persist your message");
+                }
 
                 string encryptedResponseMessage = aesHelper.Encrypt(sanitizedMessage);
                 //Broadcast the message to all clients
@@ -107,7 +127,9 @@ namespace LectitioMendaciutatis.Hubs
         //Return eligible users for a given room
         public List<string> GetEligibleUsers(string roomName) {
             if (privateRooms.ContainsKey(roomName)) {
-                return privateRooms[roomName];
+                return privateRooms[roomName]
+                .Where(username => username != roomName)
+                .ToList();
             } else {
                 throw new HubException("Room does not exist.");
             }
@@ -129,6 +151,7 @@ namespace LectitioMendaciutatis.Hubs
             }
             else
             {
+                _logger.LogWarning("Attempted to add non-existent user {Username} to room {RoomName}.", username, roomName);
                 await Clients.Caller.SendAsync("Error", "User does not exist.");
             }
         }
@@ -137,7 +160,10 @@ namespace LectitioMendaciutatis.Hubs
         {
             if (privateRooms.ContainsKey(roomName) && privateRooms[roomName].Contains(username))
             {
+
                 privateRooms[roomName].Remove(username);
+                await Clients.All.SendAsync("RemovedFromRoom", username);
+                _logger.LogInformation($"Sent 'RemovedFromRoom' message to user {username}.");
                 await Clients.Group(roomName).SendAsync("UserRemoved", username);
             }
             else
@@ -152,7 +178,13 @@ namespace LectitioMendaciutatis.Hubs
                 .Where(room => room.Value.Contains(username))
                 .Select(room => room.Key); // Return room names (usernames) where the user is allowed
 
+
             await Clients.Caller.SendAsync("RoomsAvailable", availableRooms);
+        }
+
+        public override async Task OnDisconnectedAsync(Exception exception) {
+            _logger.LogInformation("User disconnected at {Time} with ConnectionId {ConnectionId}", DateTime.UtcNow, Context.ConnectionId);
+            await base.OnDisconnectedAsync(exception);
         }
     }
 }

@@ -102,6 +102,11 @@
             //StateHasChanged();
         });
 
+        hubConnection.On<IEnumerable<string>>("RoomsAvailable", (rooms) => {
+            availableRooms = rooms.ToList();
+            InvokeAsync(StateHasChanged); // Update the UI
+        });
+
         // Start the connection
         await hubConnection.StartAsync();
         isConnected = true;
@@ -148,8 +153,8 @@
 
     // Search for rooms
     private async Task SearchRooms() {
-        await hubConnection.SendAsync("SearchRooms", searchQuery);
-        availableRooms = await hubConnection.InvokeAsync<List<string>>("SearchRooms", username);
+        await hubConnection.SendAsync("SearchRooms", username);
+        //availableRooms = await hubConnection.InvokeAsync<List<string>>("SearchRooms", username);
         if (availableRooms == null) {
             availableRooms = new List<string>();
         }
@@ -159,7 +164,7 @@
     private void JoinRoom(string roomName) {
         hubConnection.StopAsync(); // Stop SignalR connection when leaving the room
         displayMessages.Clear();
-        NavigationManager.NavigateTo($"/{roomName}");  // Redirect to the private room
+        NavigationManager.NavigateTo($"/private/{roomName}");  // Redirect to the private room
     }
 
     private class ChatMessage

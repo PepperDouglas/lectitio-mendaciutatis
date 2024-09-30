@@ -14,6 +14,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
 builder.Services.AddSignalR();
+builder.Services.AddHttpContextAccessor();
 builder.Services.AddBlazoredSessionStorage();
 builder.Services.AddHttpClient("MyApiClient", client => {
     var baseUrl = builder.Configuration["BaseUrl"] ?? "https://localhost:5001/";
