@@ -36,6 +36,8 @@ namespace LectitioMendaciutatis.Hubs
         // When a client connects, send the last 50 messages to them
         public override async Task OnConnectedAsync()
         {
+            var username = Context.User.Identity.Name;
+            _logger.LogInformation($"User connected: {username}");
             _logger.LogInformation("User connected at {Time} with ConnectionId {ConnectionId}", DateTime.UtcNow, Context.ConnectionId);
             var aesHelper = new AesEncryptionHelper(_aesKey);
 
@@ -125,7 +127,9 @@ namespace LectitioMendaciutatis.Hubs
         //Return eligible users for a given room
         public List<string> GetEligibleUsers(string roomName) {
             if (privateRooms.ContainsKey(roomName)) {
-                return privateRooms[roomName];
+                return privateRooms[roomName]
+                .Where(username => username != roomName)
+                .ToList();
             } else {
                 throw new HubException("Room does not exist.");
             }
@@ -156,7 +160,10 @@ namespace LectitioMendaciutatis.Hubs
         {
             if (privateRooms.ContainsKey(roomName) && privateRooms[roomName].Contains(username))
             {
+
                 privateRooms[roomName].Remove(username);
+                await Clients.All.SendAsync("RemovedFromRoom", username);
+                _logger.LogInformation($"Sent 'RemovedFromRoom' message to user {username}.");
                 await Clients.Group(roomName).SendAsync("UserRemoved", username);
             }
             else

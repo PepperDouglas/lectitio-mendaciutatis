@@ -9,12 +9,14 @@
 <h3>Private Room: @roomName</h3>
 
 <!-- List of users eligible for this room -->
-<h4>Eligible Users</h4>
-<ul>
-    @foreach (var user in eligibleUsers) {
-        <li>@user <button @onclick="() => RemoveUser(user)">Remove</button></li>
-    }
-</ul>
+@if (roomName == username) {
+    <h4>Eligible Users</h4>
+    <ul>
+        @foreach (var user in eligibleUsers) {
+            <li>@user <button @onclick="() => RemoveUser(user)">Remove</button></li>
+        }
+    </ul>
+}
 
 <!-- Add users to the room -->
 <h4>Add Users</h4>
@@ -77,6 +79,16 @@
             InvokeAsync(StateHasChanged);
         });
 
+        hubConnection.On<string>("RemovedFromRoom", async (removedUsername) => {
+            if (removedUsername == username) {
+                // Notify the user
+                Console.WriteLine($"Received 'RemovedFromRoom' for client");
+                await InvokeAsync(() => {
+                    LeaveRoom();
+                });
+            }
+        });
+
         try {
             await hubConnection.StartAsync();
             isConnected = true;
@@ -124,11 +136,13 @@
     private async Task AddUser() {
         await hubConnection.SendAsync("AddUserToRoom", roomName, newUser);
         newUser = ""; // Clear input after adding
+        eligibleUsers = await hubConnection.InvokeAsync<List<string>>("GetEligibleUsers", roomName);
     }
 
     // Remove a user from the room
     private async Task RemoveUser(string username) {
         await hubConnection.SendAsync("RemoveUserFromRoom", roomName, username);
+        eligibleUsers = await hubConnection.InvokeAsync<List<string>>("GetEligibleUsers", roomName);
     }
 
     // Leave the private room and return to the main chat room
