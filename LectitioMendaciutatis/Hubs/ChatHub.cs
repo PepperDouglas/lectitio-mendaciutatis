@@ -8,6 +8,7 @@ using System.Linq;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Ganss.Xss;
+using Microsoft.AspNetCore.Http;
 
 namespace LectitioMendaciutatis.Hubs
 {
@@ -21,13 +22,15 @@ namespace LectitioMendaciutatis.Hubs
         private static Dictionary<string, List<string>> privateRooms = new();
         private readonly HtmlSanitizer _htmlSanitizer;
         private readonly ILogger<ChatHub> _logger;
+        private readonly IHttpContextAccessor _httpContextAccessor;
 
-        public ChatHub(ChatContext context, IConfiguration configuration, ILogger<ChatHub> logger)
+        public ChatHub(ChatContext context, IConfiguration configuration, ILogger<ChatHub> logger, IHttpContextAccessor httpContextAccessor)
         {
             _context = context;
             _aesKey = configuration["AESKey"];
             _htmlSanitizer = new HtmlSanitizer();
             _logger = logger;
+            _httpContextAccessor = httpContextAccessor;
         }
 
         // When a client connects, send the last 50 messages to them
@@ -37,7 +40,8 @@ namespace LectitioMendaciutatis.Hubs
             var aesHelper = new AesEncryptionHelper(_aesKey);
 
             // Get the room name from the query string (passed by the client when connecting)
-            var httpContext = Context.GetHttpContext();
+            //var httpContext = Context.GetHttpContext();
+            var httpContext = _httpContextAccessor.HttpContext;
             var roomName = httpContext.Request.Query["room"].ToString();
             // If no room is provided, default to "main"
             if (string.IsNullOrEmpty(roomName)) {
@@ -166,6 +170,7 @@ namespace LectitioMendaciutatis.Hubs
             var availableRooms = privateRooms
                 .Where(room => room.Value.Contains(username))
                 .Select(room => room.Key); // Return room names (usernames) where the user is allowed
+
 
             await Clients.Caller.SendAsync("RoomsAvailable", availableRooms);
         }
