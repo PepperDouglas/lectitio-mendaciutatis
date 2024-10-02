@@ -29,7 +29,6 @@
     </ul>
 }
 
-
 @if (!isConnected) {
     <p>Connecting to the chat...</p>
 } else {
@@ -65,19 +64,12 @@
             return;
         }
 
-        //read the aes key from config
+        //Read the aes key from config
         aesKey = Configuration["AESKey"];
 
         // Decode the JWT token to extract the username
         var handler = new JwtSecurityTokenHandler();
         var jwtToken = handler.ReadJwtToken(token);
-
-        //testing
-        foreach (var claim in jwtToken.Claims)
-        {
-            Console.WriteLine($"Claim Type: {claim.Type}, Value: {claim.Value}");
-        }
-        //end testing
 
         username = jwtToken.Claims.First(claim => claim.Type == "unique_name").Value;
 
@@ -91,30 +83,24 @@
         // Handle incoming messages from the server
         hubConnection.On<string, string>("ReceiveMessage", (user, encryptedMessage) => {
             var aesHelper = new AesEncryptionHelper(aesKey);
-            Console.WriteLine($"Received encrypted message client: {encryptedMessage}");
             string decryptedMessage = aesHelper.Decrypt(encryptedMessage);
-            Console.WriteLine($"Decrypted message client: {decryptedMessage}");
 
             messages.Add(new ChatMessage { Username = user, Message = decryptedMessage });
             UpdateDisplayMessages();
-            // Trigger asynchronous UI re-render when new messages are received
             InvokeAsync(StateHasChanged);
-            //StateHasChanged();
         });
 
         hubConnection.On<IEnumerable<string>>("RoomsAvailable", (rooms) => {
             availableRooms = rooms.ToList();
-            InvokeAsync(StateHasChanged); // Update the UI
+            InvokeAsync(StateHasChanged);
         });
 
-        // Start the connection
         await hubConnection.StartAsync();
         isConnected = true;
     }
 
     private void OnInputChanged(ChangeEventArgs e) {
         message = e.Value?.ToString();
-        //StateHasChanged();  // Force a UI update after typing
     }
 
     private string EncryptMessage(string message) {
@@ -124,9 +110,7 @@
 
     private async Task SendMessage() {
         if (hubConnection is not null && !string.IsNullOrEmpty(message)) {
-            Console.WriteLine($"Encrypting message: {message}");
             string encryptedMessage = EncryptMessage(message);
-            Console.WriteLine($"Encrypted message: {encryptedMessage}");
             await hubConnection.SendAsync("SendMessage", "main", username, encryptedMessage);
             message = "";
         }
@@ -136,7 +120,6 @@
         if (e.Key == "Enter" && !string.IsNullOrEmpty(message)) {
             SendMessage();
         }
-
         StateHasChanged();
     }
 
@@ -146,25 +129,28 @@
 
     // Create a new private room
     private async Task CreateRoom() {
-        var roomName = "private/" + username;  // Room name is the creator's username
+        var roomName = "private/" + username;
         await hubConnection.SendAsync("CreateRoom");
-        NavigationManager.NavigateTo($"/{roomName}");  // Redirect to the private room
+        NavigationManager.NavigateTo($"/{roomName}");
     }
 
     // Search for rooms
     private async Task SearchRooms() {
         await hubConnection.SendAsync("SearchRooms", username);
-        //availableRooms = await hubConnection.InvokeAsync<List<string>>("SearchRooms", username);
         if (availableRooms == null) {
             availableRooms = new List<string>();
         }
     }
 
     // Join the selected room
-    private void JoinRoom(string roomName) {
-        hubConnection.StopAsync(); // Stop SignalR connection when leaving the room
-        displayMessages.Clear();
-        NavigationManager.NavigateTo($"/private/{roomName}");  // Redirect to the private room
+    private async Task JoinRoom(string roomName) {
+        var canJoin = await hubConnection.InvokeAsync<bool>("CanUserJoinRoom", roomName, username);
+
+        if (canJoin) {
+            await hubConnection.StopAsync();
+            displayMessages.Clear();
+            NavigationManager.NavigateTo($"/private/{roomName}");
+        }
     }
 
     private class ChatMessage

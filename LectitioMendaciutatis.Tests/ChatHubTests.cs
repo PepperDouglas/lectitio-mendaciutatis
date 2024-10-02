@@ -13,6 +13,8 @@ using LectitioMendaciutatis.Models;
 using LectitioMendaciutatis.Data;
 using Microsoft.Extensions.Configuration;
 using System.Security.Claims;
+using Microsoft.Extensions.Primitives;
+using System.Reflection;
 
 public class ChatHubTests
 {
@@ -218,14 +220,22 @@ public class ChatHubTests
     public async Task OnConnectedAsync_Should_Send_Messages_From_Specific_Room() {
         // Arrange
         var roomName = "room1";
-        var query = new QueryCollection(new Dictionary<string, Microsoft.Extensions.Primitives.StringValues>
+        var username = "DefaultTestUser";
+
+        // Set up the query string in the mock HttpContext
+        var query = new QueryCollection(new Dictionary<string, StringValues>
     {
         { "room", roomName }
     });
-
-        // Set up the query string in the mock HttpContext
         var mockHttpContext = _httpContextAccessorMock.Object.HttpContext;
         Mock.Get(mockHttpContext).Setup(c => c.Request.Query).Returns(query);
+
+        // Use reflection to access the private 'privateRooms' field
+        var privateRoomsField = typeof(ChatHub).GetField("privateRooms", BindingFlags.NonPublic | BindingFlags.Static);
+        var privateRooms = (Dictionary<string, List<string>>)privateRoomsField.GetValue(null);
+
+        // Ensure the room exists and the user is eligible
+        privateRooms[roomName] = new List<string> { username };
 
         // Seed the database with messages from multiple rooms
         for (int i = 0; i < 50; i++) {
@@ -262,7 +272,7 @@ public class ChatHubTests
                     It.Is<object[]>(o =>
                         (string)o[0] == message.Username &&
                         (string)o[1] == expectedEncryptedMessage),
-                    default),
+                    It.IsAny<CancellationToken>()),
                 Times.Once);
         }
 
@@ -282,10 +292,59 @@ public class ChatHubTests
                     It.Is<object[]>(o =>
                         (string)o[0] == message.Username &&
                         (string)o[1] == expectedEncryptedMessage),
-                    default),
+                    It.IsAny<CancellationToken>()),
                 Times.Never);
         }
     }
 
+    [Fact]
+    public async Task User_Cannot_Join_Private_Room_When_Not_In_Eligible_Users_List() {
+        // Arrange
+        var roomName = "PrivateRoom";
+        var username = "UnauthorizedUser";
 
+        // Set up user identity
+        var mockIdentity = new Mock<ClaimsIdentity>();
+        mockIdentity.Setup(i => i.IsAuthenticated).Returns(true);
+        mockIdentity.Setup(i => i.Name).Returns(username);
+
+        var mockPrincipal = new Mock<ClaimsPrincipal>();
+        mockPrincipal.Setup(p => p.Identity).Returns(mockIdentity.Object);
+
+        _hubCallerContextMock.Setup(c => c.User).Returns(mockPrincipal.Object);
+
+        // Set up the query string in the mock HttpContext
+        var query = new QueryCollection(new Dictionary<string, StringValues>
+    {
+        { "room", roomName }
+    });
+        var mockHttpContext = _httpContextAccessorMock.Object.HttpContext;
+        Mock.Get(mockHttpContext).Setup(c => c.Request.Query).Returns(query);
+
+        // Add room and eligible users (excluding the unauthorized user)
+        var privateRoomsField = typeof(ChatHub).GetField("privateRooms", BindingFlags.NonPublic | BindingFlags.Static);
+        var privateRooms = (Dictionary<string, List<string>>)privateRoomsField.GetValue(null);
+        privateRooms[roomName] = new List<string> { "AuthorizedUser1", "AuthorizedUser2" };
+
+        // Set up the Groups mock BEFORE calling OnConnectedAsync
+        var groupsMock = new Mock<IGroupManager>();
+        _chatHub.Groups = groupsMock.Object;
+
+        // Act
+        await _chatHub.OnConnectedAsync();
+
+        // Assert
+        // Verify that an error message was sent
+        _callerMock.Verify(
+            caller => caller.SendCoreAsync(
+                "Error",
+                It.Is<object[]>(o => o[0].ToString() == "You are not allowed to join this room."),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+
+        // Verify that the user was not added to the group
+        groupsMock.Verify(
+            groups => groups.AddToGroupAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
 }
