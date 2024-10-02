@@ -161,10 +161,14 @@
     }
 
     // Join the selected room
-    private void JoinRoom(string roomName) {
-        hubConnection.StopAsync(); // Stop SignalR connection when leaving the room
-        displayMessages.Clear();
-        NavigationManager.NavigateTo($"/private/{roomName}");  // Redirect to the private room
+    private async Task JoinRoom(string roomName) {
+        var canJoin = await hubConnection.InvokeAsync<bool>("CanUserJoinRoom", roomName, username);
+
+        if (canJoin) {
+            await hubConnection.StopAsync(); // Stop the current SignalR connection
+            displayMessages.Clear();
+            NavigationManager.NavigateTo($"/private/{roomName}");  // Redirect to the private room
+        }
     }
 
     private class ChatMessage

@@ -36,6 +36,9 @@ namespace LectitioMendaciutatis.Hubs
         // When a client connects, send the last 50 messages to them
         public override async Task OnConnectedAsync()
         {
+            if (Context.User == null) {
+                return;
+            }
             var username = Context.User.Identity.Name;
             _logger.LogInformation($"User connected: {username}");
             _logger.LogInformation("User connected at {Time} with ConnectionId {ConnectionId}", DateTime.UtcNow, Context.ConnectionId);
@@ -48,6 +51,13 @@ namespace LectitioMendaciutatis.Hubs
             // If no room is provided, default to "main"
             if (string.IsNullOrEmpty(roomName)) {
                 roomName = "main";
+            }
+
+            if (!CanUserJoinRoom(roomName, username)) {
+                await RemoveUserFromRoom(roomName, username);
+                await Clients.Caller.SendAsync("Error", "You are not allowed to join this room.");
+                Context.Abort();
+                return;
             }
 
             var messages = _context.ChatMessages
@@ -180,6 +190,19 @@ namespace LectitioMendaciutatis.Hubs
 
 
             await Clients.Caller.SendAsync("RoomsAvailable", availableRooms);
+        }
+
+        public bool CanUserJoinRoom(string roomName, string username) {
+            if (roomName == "main" || roomName == username) {
+                return true;
+            }
+
+            if (!privateRooms.ContainsKey(roomName)) {
+                return false;
+            }
+
+            var eligibleUsers = GetEligibleUsers(roomName);
+            return eligibleUsers.Contains(username);
         }
 
         public override async Task OnDisconnectedAsync(Exception exception) {
