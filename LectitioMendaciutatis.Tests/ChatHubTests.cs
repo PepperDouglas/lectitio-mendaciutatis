@@ -347,8 +347,4 @@ public class ChatHubTests
             groups => groups.AddToGroupAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
-
-
-
-
 }

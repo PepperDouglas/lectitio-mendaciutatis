@@ -1,11 +1,10 @@
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.IdentityModel.Tokens;
 using LectitioMendaciutatis.Data;
 using LectitioMendaciutatis.Models;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
-using BCrypt.Net;
 
 namespace LectitioMendaciutatis.Controllers
 {
@@ -76,7 +75,6 @@ namespace LectitioMendaciutatis.Controllers
         }
     }
 
-    // DTOs
     public class UserDto
     {
         public required string Username { get; set; }
