@@ -6,37 +6,58 @@
 
 @page "/private/{roomName}"
 
-<h3>Private Room: @roomName</h3>
+<div class="container mt-4">
+    <h3 class="text-center mb-4">Private Room: @roomName</h3>
 
-<!-- List of users eligible for this room -->
-@if (roomName == username) {
-    <h4>Eligible Users</h4>
-    <ul>
-        @foreach (var user in eligibleUsers) {
-            <li>@user <button @onclick="() => RemoveUser(user)">Remove</button></li>
-        }
-    </ul>
-}
+    @if (roomName == username) {
+        <div class="mb-4">
+            <h4>Eligible Users</h4>
+            <ul class="list-group">
+                @foreach (var user in eligibleUsers) {
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        @user
+                        <button class="btn btn-danger btn-sm" @onclick="() => RemoveUser(user)">Remove</button>
+                    </li>
+                }
+            </ul>
+        </div>
 
-<!-- Add users to the room -->
-<h4>Add Users</h4>
-<input @bind="newUser" placeholder="Enter username" />
-<button @onclick="AddUser">Add User</button>
+        <div class="mb-4">
+            <h4>Add Users</h4>
+            <div class="input-group" style="max-width: 400px;">
+                <input class="form-control" @bind="newUser" placeholder="Enter username" />
+                <div class="input-group-append">
+                    <button class="btn btn-info" @onclick="AddUser">Add User</button>
+                </div>
+            </div>
+        </div>
+    }
 
-@if (!isConnected) {
-    <p>Connecting to the private chat...</p>
-} else {
-    <div id="chat">
-        @foreach (var msg in displayMessages) {
-            <p><strong>@msg.Username</strong>: @msg.Message</p>
-        }
+    @if (!isConnected) {
+        <p class="text-muted">Connecting to the private chat...</p>
+    } else {
+        <div class="card">
+            <div class="card-body" style="height: 400px; overflow-y: auto;" id="chat">
+                @foreach (var msg in displayMessages) {
+                    <p><strong>@msg.Username</strong>: @msg.Message</p>
+                }
+            </div>
+            <div class="card-footer">
+                <div class="input-group">
+                    <InputText class="form-control" @bind-Value="message" @oninput="OnInputChanged" @onkeypress="CheckAndSendMessage" placeholder="Type your message..." />
+                    <div class="input-group-append">
+                        <button class="btn btn-primary" @onclick="SendMessage" disabled="@string.IsNullOrEmpty(message)">Send</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Leave Room Button -->
+    <div class="mt-3 text-right">
+        <button class="btn btn-secondary" @onclick="LeaveRoom">Leave Room</button>
     </div>
-
-    <InputText @bind-Value="message" @oninput="OnInputChanged" @onkeypress="CheckAndSendMessage" />
-    <button @onclick="SendMessage" disabled="@string.IsNullOrEmpty(message)">Send</button>
-}
-
-<button @onclick="LeaveRoom">Leave Room</button>
+</div>
 
 @code {
     [Parameter]

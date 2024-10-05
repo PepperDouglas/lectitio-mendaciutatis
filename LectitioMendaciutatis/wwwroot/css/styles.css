@@ -1,0 +1,265 @@
+﻿/* styles.css */
+
+/* General Reset and Box-Sizing */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+/* Body Styling */
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f0f2f5;
+}
+
+/* Container */
+.container {
+    max-width: 500px;
+    margin: 50px auto;
+    padding: 20px;
+    background-color: #fff;
+    border-radius: 5px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+}
+
+/* Header */
+.header {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+    .header h3 {
+        color: #333;
+    }
+
+/* Form Styling */
+form {
+    display: flex;
+    flex-direction: column;
+}
+
+    form label {
+        margin-bottom: 5px;
+        font-weight: bold;
+        color: #333;
+    }
+
+    form input[type="text"],
+    form input[type="password"],
+    form input[type="email"] {
+        padding: 10px;
+        margin-bottom: 15px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+    }
+
+        form input[type="text"]:focus,
+        form input[type="password"]:focus,
+        form input[type="email"]:focus {
+            border-color: #007BFF;
+            outline: none;
+        }
+
+    form button {
+        padding: 10px;
+        background-color: #007BFF;
+        color: #fff;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 16px;
+    }
+
+        form button:hover {
+            background-color: #0056b3;
+        }
+
+/* Error Message */
+.error-message {
+    color: red;
+    margin-bottom: 15px;
+}
+
+/* Chat Styling */
+.chat-container {
+    max-width: 800px;
+    margin: 20px auto;
+    display: flex;
+    flex-direction: column;
+    height: 80vh;
+    background-color: #fff;
+    border-radius: 5px;
+    overflow: hidden;
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+}
+
+.chat-header {
+    padding: 15px;
+    background-color: #007BFF;
+    color: #fff;
+    font-size: 20px;
+    font-weight: bold;
+    text-align: center;
+}
+
+.chat-messages {
+    flex: 1;
+    padding: 15px;
+    overflow-y: auto;
+    background-color: #e5e5e5;
+}
+
+    .chat-messages p {
+        margin-bottom: 10px;
+    }
+
+        .chat-messages p strong {
+            color: #007BFF;
+        }
+
+.chat-input {
+    display: flex;
+    padding: 10px;
+    background-color: #f1f1f1;
+}
+
+    .chat-input input[type="text"] {
+        flex: 1;
+        padding: 10px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+    }
+
+        .chat-input input[type="text"]:focus {
+            border-color: #007BFF;
+            outline: none;
+        }
+
+    .chat-input button {
+        padding: 10px 15px;
+        margin-left: 10px;
+        background-color: #007BFF;
+        color: #fff;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+
+        .chat-input button:hover {
+            background-color: #0056b3;
+        }
+
+/* List Styling */
+ul {
+    list-style-type: none;
+    padding: 0;
+}
+
+    ul li {
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+    }
+
+        ul li button {
+            margin-left: auto;
+            padding: 5px 10px;
+            background-color: #dc3545;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+            ul li button:hover {
+                background-color: #c82333;
+            }
+
+/* Search and Create Room */
+.search-create {
+    display: flex;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+    .search-create input {
+        flex: 1;
+        padding: 10px;
+        margin-right: 10px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+    }
+
+    .search-create button {
+        padding: 10px 15px;
+        background-color: #28a745;
+        color: #fff;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+
+        .search-create button:hover {
+            background-color: #218838;
+        }
+
+/* Eligible Users Section */
+.eligible-users {
+    margin-bottom: 20px;
+}
+
+    .eligible-users h4 {
+        margin-bottom: 10px;
+    }
+
+    .eligible-users ul li button {
+        background-color: #dc3545;
+    }
+
+        .eligible-users ul li button:hover {
+            background-color: #c82333;
+        }
+
+/* Add Users Section */
+.add-users {
+    margin-bottom: 20px;
+}
+
+    .add-users h4 {
+        margin-bottom: 10px;
+    }
+
+    .add-users input {
+        padding: 10px;
+        margin-right: 10px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+    }
+
+    .add-users button {
+        padding: 10px 15px;
+        background-color: #17a2b8;
+        color: #fff;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+
+        .add-users button:hover {
+            background-color: #138496;
+        }
+
+/* No Rooms Found Message */
+.no-rooms {
+    text-align: center;
+    color: #666;
+    margin-bottom: 20px;
+}
+
+/* Connecting Message */
+.connecting-message {
+    text-align: center;
+    color: #666;
+    margin: 20px 0;
+}

@@ -7,40 +7,51 @@
 @using System.IdentityModel.Tokens.Jwt
 @using System.Security.Claims
 
-<h3>Chat Room</h3>
+<div class="container mt-4">
+    <h3 class="text-center mb-4">Chat Room</h3>
 
-<!-- Create Private Room -->
-<button @onclick="CreateRoom">Create Private Room</button>
+    <div class="d-flex mb-3">
+        <!-- Create Private Room -->
+        <button class="btn btn-primary mr-2" @onclick="CreateRoom">Create Private Room</button>
 
-<!-- Search for Available Rooms -->
-<input @bind="searchQuery" placeholder="Search Rooms" />
-<button @onclick="SearchRooms">Search</button>
-
-@if (availableRooms == null || availableRooms.Count == 0) {
-    <p>No rooms found.</p>
-} else {
-    <ul>
-        @foreach (var room in availableRooms) {
-            <li>
-                @room
-                <button @onclick="() => JoinRoom(room)">Join</button>
-            </li>
-        }
-    </ul>
-}
-
-@if (!isConnected) {
-    <p>Connecting to the chat...</p>
-} else {
-    <div id="chat">
-        @foreach (var msg in displayMessages) {
-            <p><strong>@msg.Username</strong>: @msg.Message</p>
-        }
+        <!-- Search for Available Rooms -->
+        <input class="form-control mr-2" @bind="searchQuery" placeholder="Search Rooms" style="max-width: 200px;" />
+        <button class="btn btn-outline-secondary" @onclick="SearchRooms">Search</button>
     </div>
 
-    <InputText @bind-Value="message" @oninput="OnInputChanged" @onkeypress="CheckAndSendMessage" />
-    <button @onclick="SendMessage" disabled="@string.IsNullOrEmpty(message)">Send</button>
-}
+    @if (availableRooms == null || availableRooms.Count == 0) {
+        <p class="text-muted">No rooms found.</p>
+    } else {
+        <ul class="list-group mb-3">
+            @foreach (var room in availableRooms) {
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    @room
+                    <button class="btn btn-success btn-sm" @onclick="() => JoinRoom(room)">Join</button>
+                </li>
+            }
+        </ul>
+    }
+
+    @if (!isConnected) {
+        <p class="text-muted">Connecting to the chat...</p>
+    } else {
+        <div class="card">
+            <div class="card-body" style="height: 400px; overflow-y: auto;" id="chat">
+                @foreach (var msg in displayMessages) {
+                    <p><strong>@msg.Username</strong>: @msg.Message</p>
+                }
+            </div>
+            <div class="card-footer">
+                <div class="input-group">
+                    <InputText class="form-control" @bind-Value="message" @oninput="OnInputChanged" @onkeypress="CheckAndSendMessage" placeholder="Type your message..." />
+                    <div class="input-group-append">
+                        <button class="btn btn-primary" @onclick="SendMessage" disabled="@string.IsNullOrEmpty(message)">Send</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
 
 @code {
     private List<ChatMessage> messages = new();
