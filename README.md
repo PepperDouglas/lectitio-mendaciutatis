@@ -20,7 +20,7 @@ Get-ChildItem -Path cert:\LocalMachine\My
 
 $pwd = ConvertTo-SecureString -String "your-pfx-password" -Force -AsPlainText
 
-Export-PfxCertificate -Cert cert:\LocalMachine\My\$($cert.Thumbprint) -FilePath "C:\path\to\your\project\certs\selfsigned.pfx" -Password $pwd
+Export-PfxCertificate -Cert cert:\LocalMachine\My\\$cert.Thumbprint -FilePath "C:\path\to\your\project\certs\selfsigned.pfx" -Password $pwd
 
 Navigate to Trusted Root Certification Authorities on your machine and add the exported cert to trusted root store with **certlm.msc**
 
