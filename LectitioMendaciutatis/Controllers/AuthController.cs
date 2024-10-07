@@ -29,6 +29,11 @@ namespace LectitioMendaciutatis.Controllers
                 return BadRequest(new { message = "Passwords do not match" });
             }
 
+            var existingUser = _context.Users.FirstOrDefault(u => u.Username == userDto.Username);
+            if (existingUser != null) {
+                return BadRequest(new { message = "Username already exists" });
+            }
+
             var hashedPassword = BCrypt.Net.BCrypt.HashPassword(userDto.Password);
             var user = new User { Username = userDto.Username, PasswordHash = hashedPassword };
 
