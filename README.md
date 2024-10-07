@@ -1,6 +1,8 @@
 # Lectitio Mendaciutatis
 
-## Local Development: Self-Signed SSL Certificate Setup
+A secure, real-time chat application built with Blazor server, SignalR and EF Core. Featuring Auth, encryption, private rooms and more.
+
+## Local Development:
 
 For local development, we use a self-signed SSL certificate to secure communication over HTTPS. Each developer should generate their own certificate for their machine. Follow the steps below to create and install the certificate.
 
@@ -14,13 +16,29 @@ New-SelfSignedCertificate -DnsName "localhost" -CertStoreLocation "cert:\LocalMa
 
 Get-ChildItem -Path cert:\LocalMachine\My
 
+**Replace [your-pfx-password] with your own password**
+
 $pwd = ConvertTo-SecureString -String "your-pfx-password" -Force -AsPlainText
+
+**Replace [THUMBPRINT] with the displayed one, update path to correct one for you**
 
 Export-PfxCertificate -Cert cert:\LocalMachine\My\THUMBPRINT -FilePath"C:\path\to\your\project\certs\selfsigned.pfx" -Password $pwd
 
-### In Program.cs
+Navigate to Trusted Root Certification Authorities on your machine and add the exported cert to trusted root store
+
+### In Program.cs replace [your-pfx-password] with the one you chose
 
 options.ListenAnyIP(5001, listenOptions =>
     {
         listenOptions.UseHttps("certs/selfsigned.pfx", "your-pfx-password");
     });
+
+### Create the database if it's not already set up
+
+dotnet ef database update
+
+### Start application
+
+dotnet restore
+
+dotnet run
