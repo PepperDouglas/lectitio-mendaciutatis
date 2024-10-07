@@ -1,4 +1,5 @@
 using LectitioMendaciutatis.Data;
+using LectitioMendaciutatis.Hubs;
 using LectitioMendaciutatis.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
@@ -29,6 +30,11 @@ namespace LectitioMendaciutatis.Controllers
                 return BadRequest(new { message = "Passwords do not match" });
             }
 
+            var existingUser = _context.Users.FirstOrDefault(u => u.Username == userDto.Username);
+            if (existingUser != null) {
+                return BadRequest(new { message = "Username already exists" });
+            }
+
             var hashedPassword = BCrypt.Net.BCrypt.HashPassword(userDto.Password);
             var user = new User { Username = userDto.Username, PasswordHash = hashedPassword };
 
@@ -48,11 +54,15 @@ namespace LectitioMendaciutatis.Controllers
                 return Unauthorized(new { message = "Invalid credentials" });
             }
 
-            // Generate a JWT token if login is successful
             var token = GenerateJwtToken(user);
 
-            // Return the token as part of the JSON response
             return Ok(new { Token = token });
+        }
+
+        [HttpGet("exists/{roomName}")]
+        public IActionResult DoesRoomExist(string roomName) {
+            bool exists = ChatHub.DoesRoomExist(roomName);
+            return Ok(new { exists });
         }
 
         private string GenerateJwtToken(User user)

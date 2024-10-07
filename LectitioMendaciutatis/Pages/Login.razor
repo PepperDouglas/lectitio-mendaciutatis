@@ -5,24 +5,25 @@
 
 @page "/login"
 
-<h3>Login</h3>
+<div class="container mt-5" style="max-width: 400px;">
+    <h3 class="text-center mb-4">Login</h3>
 
-@if (errorMessage != null)
-{
-    <p style="color:red">@errorMessage</p>
-}
+    @if (errorMessage != null) {
+        <div class="alert alert-danger">@errorMessage</div>
+    }
 
-<EditForm Model="@loginDto" OnValidSubmit="HandleLogin">
-    <div>
-        <label>Username:</label>
-        <InputText @bind-Value="loginDto.Username" />
-    </div>
-    <div>
-        <label>Password:</label>
-        <InputText @bind-Value="loginDto.Password" InputType="password" />
-    </div>
-    <button type="submit">Login</button>
-</EditForm>
+    <EditForm Model="@loginDto" OnValidSubmit="HandleLogin">
+        <div class="form-group">
+            <label for="username">Username:</label>
+            <InputText id="username" class="form-control" @bind-Value="loginDto.Username" />
+        </div>
+        <div class="form-group">
+            <label for="password">Password:</label>
+            <InputText id="password" class="form-control" @bind-Value="loginDto.Password" InputType="password" />
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">Login</button>
+    </EditForm>
+</div>
 
 @code {
     private LoginDto loginDto = new LoginDto();

@@ -190,6 +190,10 @@ namespace LectitioMendaciutatis.Hubs
             return eligibleUsers.Contains(username);
         }
 
+        public static bool DoesRoomExist(string roomName) {
+            return privateRooms.ContainsKey(roomName);
+        }
+
         public override async Task OnDisconnectedAsync(Exception exception) {
             _logger.LogInformation("User disconnected at {Time} with ConnectionId {ConnectionId}", DateTime.UtcNow, Context.ConnectionId);
             await base.OnDisconnectedAsync(exception);
