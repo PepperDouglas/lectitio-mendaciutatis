@@ -65,49 +65,56 @@
 
     private HubConnection? hubConnection;
 
-    protected override async Task OnInitializedAsync() {
-        // Get JWT token from sessionStorage
-        var token = await sessionStorage.GetItemAsync<string>("jwtToken");
-
-        // Redirect to login if token is missing
-        if (string.IsNullOrEmpty(token)) {
-            NavigationManager.NavigateTo("/login");
-            return;
-        }
-
-        //Read the aes key from config
+    protected override void OnInitialized() {
+        // Read the AES key from config
         aesKey = Configuration["AESKey"];
+    }
 
-        // Decode the JWT token to extract the username
-        var handler = new JwtSecurityTokenHandler();
-        var jwtToken = handler.ReadJwtToken(token);
+    protected override async Task OnAfterRenderAsync(bool firstRender) {
+        if (firstRender) {
+            // Get JWT token from sessionStorage
+            var token = await sessionStorage.GetItemAsync<string>("jwtToken");
 
-        username = jwtToken.Claims.First(claim => claim.Type == "unique_name").Value;
+            // Redirect to login if token is missing
+            if (string.IsNullOrEmpty(token)) {
+                NavigationManager.NavigateTo("/login");
+                return;
+            }
 
-        // Connect to SignalR hub, passing the JWT token for authentication
-        hubConnection = new HubConnectionBuilder()
-            .WithUrl(NavigationManager.ToAbsoluteUri("/chathub?room=main"), options => {
-                options.AccessTokenProvider = () => Task.FromResult(token);
-            })
-            .Build();
+            // Decode the JWT token to extract the username
+            var handler = new JwtSecurityTokenHandler();
+            var jwtToken = handler.ReadJwtToken(token);
 
-        // Handle incoming messages from the server
-        hubConnection.On<string, string>("ReceiveMessage", (user, encryptedMessage) => {
-            var aesHelper = new AesEncryptionHelper(aesKey);
-            string decryptedMessage = aesHelper.Decrypt(encryptedMessage);
+            username = jwtToken.Claims.First(claim => claim.Type == "unique_name").Value;
 
-            messages.Add(new ChatMessage { Username = user, Message = decryptedMessage });
-            UpdateDisplayMessages();
-            InvokeAsync(StateHasChanged);
-        });
+            // Connect to SignalR hub, passing the JWT token for authentication
+            hubConnection = new HubConnectionBuilder()
+                .WithUrl(NavigationManager.ToAbsoluteUri("/chathub?room=main"), options => {
+                    options.AccessTokenProvider = () => Task.FromResult(token);
+                })
+                .Build();
 
-        hubConnection.On<IEnumerable<string>>("RoomsAvailable", (rooms) => {
-            availableRooms = rooms.ToList();
-            InvokeAsync(StateHasChanged);
-        });
+            // Handle incoming messages from the server
+            hubConnection.On<string, string>("ReceiveMessage", (user, encryptedMessage) => {
+                var aesHelper = new AesEncryptionHelper(aesKey);
+                string decryptedMessage = aesHelper.Decrypt(encryptedMessage);
 
-        await hubConnection.StartAsync();
-        isConnected = true;
+                messages.Add(new ChatMessage { Username = user, Message = decryptedMessage });
+                UpdateDisplayMessages();
+                InvokeAsync(StateHasChanged);
+            });
+
+            hubConnection.On<IEnumerable<string>>("RoomsAvailable", (rooms) => {
+                availableRooms = rooms.ToList();
+                InvokeAsync(StateHasChanged);
+            });
+
+            await hubConnection.StartAsync();
+            isConnected = true;
+
+            // Trigger a UI update
+            StateHasChanged();
+        }
     }
 
     private void OnInputChanged(ChangeEventArgs e) {

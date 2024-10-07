@@ -1,4 +1,5 @@
 using LectitioMendaciutatis.Data;
+using LectitioMendaciutatis.Hubs;
 using LectitioMendaciutatis.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
@@ -53,11 +54,15 @@ namespace LectitioMendaciutatis.Controllers
                 return Unauthorized(new { message = "Invalid credentials" });
             }
 
-            // Generate a JWT token if login is successful
             var token = GenerateJwtToken(user);
 
-            // Return the token as part of the JSON response
             return Ok(new { Token = token });
+        }
+
+        [HttpGet("exists/{roomName}")]
+        public IActionResult DoesRoomExist(string roomName) {
+            bool exists = ChatHub.DoesRoomExist(roomName);
+            return Ok(new { exists });
         }
 
         private string GenerateJwtToken(User user)

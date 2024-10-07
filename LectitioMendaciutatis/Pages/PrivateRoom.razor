@@ -3,6 +3,8 @@
 @inject NavigationManager NavigationManager
 @inject Blazored.SessionStorage.ISessionStorageService sessionStorage
 @inject IConfiguration Configuration
+@using System.Net.Http.Json
+@inject IHttpClientFactory HttpClientFactory
 
 @page "/private/{roomName}"
 
@@ -53,7 +55,6 @@
         </div>
     }
 
-    <!-- Leave Room Button -->
     <div class="mt-3 text-right">
         <button class="btn btn-secondary" @onclick="LeaveRoom">Leave Room</button>
     </div>
@@ -73,72 +74,97 @@
 
     private string aesKey;
 
-    // Initialize SignalR hub connection for private room
     protected override async Task OnInitializedAsync() {
+        var httpClient = HttpClientFactory.CreateClient("MyApiClient");
+        var response = await httpClient.GetAsync($"/api/auth/exists/{roomName}");
 
-        var token = await sessionStorage.GetItemAsync<string>("jwtToken");
-
-        hubConnection = new HubConnectionBuilder()
-            .WithUrl(NavigationManager.ToAbsoluteUri($"/chathub?room={roomName}"), options => {
-                options.AccessTokenProvider = () => Task.FromResult(token);
-            })
-            .Build();
-
-        var handler = new JwtSecurityTokenHandler();
-        var jwtToken = handler.ReadJwtToken(token);
-        username = jwtToken.Claims.First(claim => claim.Type == "unique_name").Value;
-
-        aesKey = Configuration["AESKey"];
-
-        // Set up message receiving
-        hubConnection.On<string, string>("ReceiveMessage", (user, encryptedMessage) => {
-            var aesHelper = new AesEncryptionHelper(aesKey); // Use the shared AES key
-            string decryptedMessage = aesHelper.Decrypt(encryptedMessage);
-            // Handle the decrypted message here (e.g., display it in the UI)
-            messages.Add(new ChatMessage { Username = user, Message = decryptedMessage });
-            UpdateDisplayMessages();
-            InvokeAsync(StateHasChanged);
-        });
-
-        hubConnection.On<string>("RemovedFromRoom", async (removedUsername) => {
-            if (removedUsername == username) {
-                // Notify the user
-                Console.WriteLine($"Received 'RemovedFromRoom' for client");
-                await InvokeAsync(() => {
-                    LeaveRoom();
-                });
+        if (response.IsSuccessStatusCode) {
+            var data = await response.Content.ReadFromJsonAsync<Dictionary<string, bool>>();
+            //Successful res, Key exists, The room doesnt: redirect
+            if (data != null && data.ContainsKey("exists") && data["exists"] == false) {
+                NavigationManager.NavigateTo("/chat");
+                return;
             }
-        });
-
-        try {
-            await hubConnection.StartAsync();
-            isConnected = true;
-
-            // Fetch eligible users only after the connection is ready
-            eligibleUsers = await hubConnection.InvokeAsync<List<string>>("GetEligibleUsers", roomName);
+        } else {
+            NavigationManager.NavigateTo("/chat");
+            return;
         }
-        catch (Exception ex) {
-            Console.WriteLine($"Error starting SignalR connection: {ex.Message}");
+        //Get AES key from configuration
+        aesKey = Configuration["AESKey"];
+    }
+
+    //Initialize hub connection for private room
+    protected override async Task OnAfterRenderAsync(bool firstRender) {
+        if (firstRender) {
+            //Get JWT token
+            var token = await sessionStorage.GetItemAsync<string>("jwtToken");
+
+            //Redirect to login if token is missing
+            if (string.IsNullOrEmpty(token)) {
+                NavigationManager.NavigateTo("/login");
+                return;
+            }
+
+            //Extract the username
+            var handler = new JwtSecurityTokenHandler();
+            var jwtToken = handler.ReadJwtToken(token);
+            username = jwtToken.Claims.First(claim => claim.Type == "unique_name").Value;
+
+            //Connection for private room
+            hubConnection = new HubConnectionBuilder()
+                .WithUrl(NavigationManager.ToAbsoluteUri($"/chathub?room={roomName}"), options => {
+                    options.AccessTokenProvider = () => Task.FromResult(token);
+                })
+                .Build();
+
+            //Message receiving
+            hubConnection.On<string, string>("ReceiveMessage", (user, encryptedMessage) => {
+                var aesHelper = new AesEncryptionHelper(aesKey);
+                string decryptedMessage = aesHelper.Decrypt(encryptedMessage);
+                
+                messages.Add(new ChatMessage { Username = user, Message = decryptedMessage });
+                UpdateDisplayMessages();
+                InvokeAsync(StateHasChanged);
+            });
+
+            hubConnection.On<string>("RemovedFromRoom", async (removedUsername) => {
+                if (removedUsername == username) {
+                    await InvokeAsync(() => {
+                        LeaveRoom();
+                    });
+                }
+            });
+
+            try {
+                await hubConnection.StartAsync();
+                isConnected = true;
+                eligibleUsers = await hubConnection.InvokeAsync<List<string>>("GetEligibleUsers", roomName);
+
+                StateHasChanged();
+            }
+            catch (Exception ex) {
+                Console.WriteLine($"Error starting SignalR connection: {ex.Message}");
+            }
         }
     }
 
-    // Send a message to the private room
+
+    //Send a message to the private room
     private async Task SendMessage() {
         if (!string.IsNullOrEmpty(message)) {
             var aesHelper = new AesEncryptionHelper(aesKey);
             string encryptedMessage = aesHelper.Encrypt(message);
 
             if (hubConnection.State == HubConnectionState.Connected) {
-                //should NOT be roomname, but username (in fact, in should be both)
-                await hubConnection.SendAsync("SendMessage", roomName, username, encryptedMessage); // Send encrypted message
-                message = "";  // Clear message input
+                await hubConnection.SendAsync("SendMessage", roomName, username, encryptedMessage);
+                message = "";
             } else {
                 Console.WriteLine("Connection is not established yet.");
             }
         }
     }
 
-    // Check if Enter is pressed to send message
+    //Check if Return/Enter is pressed to send message
     private async Task CheckAndSendMessage(KeyboardEventArgs e) {
         if (e.Key == "Enter" && !string.IsNullOrEmpty(message)) {
             await SendMessage();
@@ -150,27 +176,27 @@
     }
 
     private void UpdateDisplayMessages() {
-        displayMessages = new List<ChatMessage>(messages);  // Create a safe copy for rendering
+        displayMessages = new List<ChatMessage>(messages);  //Create a safe copy for rendering
     }
 
-    // Add a user to the room
+    //Add a user to the room
     private async Task AddUser() {
         await hubConnection.SendAsync("AddUserToRoom", roomName, newUser);
-        newUser = ""; // Clear input after adding
+        newUser = "";
         eligibleUsers = await hubConnection.InvokeAsync<List<string>>("GetEligibleUsers", roomName);
     }
 
-    // Remove a user from the room
+    //Remove a user from the room
     private async Task RemoveUser(string username) {
         await hubConnection.SendAsync("RemoveUserFromRoom", roomName, username);
         eligibleUsers = await hubConnection.InvokeAsync<List<string>>("GetEligibleUsers", roomName);
     }
 
-    // Leave the private room and return to the main chat room
+    //Leave the private room and return to the main chat room
     private void LeaveRoom() {
-        hubConnection.StopAsync(); // Stop SignalR connection when leaving the room
+        hubConnection.StopAsync(); //Stop SignalR connection when leaving the room
         displayMessages.Clear();
-        NavigationManager.NavigateTo("/chat"); // Redirect back to main chat room
+        NavigationManager.NavigateTo("/chat"); //Redirect back to main chat room
     }
 
     private class ChatMessage
